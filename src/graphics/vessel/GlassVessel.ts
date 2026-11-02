@@ -25,15 +25,15 @@ export class GlassVesselModel extends THREE.Group {
     // PBR Glass Material
     this.glassMaterial = new THREE.MeshPhysicalMaterial({
       color: 0xffffff,
-      transmission: isSoftwareGl ? 0.2 : 0.94,
-      roughness: 0.04,
-      metalness: 0.05,
+      transmission: isSoftwareGl ? 0 : 0.94,
+      roughness: 0.06,
+      metalness: 0.08,
       ior: 1.52,
       thickness: 1.2,
       clearcoat: 1.0,
       clearcoatRoughness: 0.05,
       transparent: true,
-      opacity: isSoftwareGl ? 0.45 : 1.0,
+      opacity: isSoftwareGl ? 0.22 : 1.0,
       depthWrite: false, // Ensures interior plants render cleanly without sorting artifacts
     });
 

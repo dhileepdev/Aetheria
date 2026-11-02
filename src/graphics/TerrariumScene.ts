@@ -446,10 +446,8 @@ export class TerrariumScene {
       clockTime += delta;
 
       // Smooth camera interpolation towards targets
-      if (!this.controls.state || this.controls.state === -1) {
-        this.camera.position.lerp(this.targetCameraPos, Math.min(1, delta * 3.5));
-        this.controls.target.lerp(this.targetLookAt, Math.min(1, delta * 3.5));
-      }
+      this.camera.position.lerp(this.targetCameraPos, Math.min(1, delta * 3.5));
+      this.controls.target.lerp(this.targetLookAt, Math.min(1, delta * 3.5));
 
       this.controls.update();
 

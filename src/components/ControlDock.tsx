@@ -36,6 +36,9 @@ interface ControlDockProps {
   onApplyEcosystemPreset: (presetKey: string) => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  onSelectPlant?: (id: string) => void;
+  faunaEntities?: { id: string; name: string; species: FaunaSpecies; state: string }[];
+  onSelectFaunaById?: (id: string) => void;
 }
 
 type TabType = 'flora' | 'fauna' | 'lighting' | 'weather' | 'vessel' | 'camera';
@@ -49,6 +52,9 @@ export const ControlDock: React.FC<ControlDockProps> = ({
   onApplyEcosystemPreset,
   isCollapsed,
   onToggleCollapse,
+  onSelectPlant,
+  faunaEntities = [],
+  onSelectFaunaById,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('flora');
 
@@ -164,6 +170,34 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                   );
                 })}
               </div>
+
+              {/* Placed Plants Quick-Select Strip */}
+              {state.placedPlants.length > 0 && onSelectPlant && (
+                <div className="flex items-center gap-1.5 pt-1 overflow-x-auto no-scrollbar">
+                  <span className="text-[11px] text-neutral-500 whitespace-nowrap mr-1">
+                    In Terrarium ({state.placedPlants.length}):
+                  </span>
+                  {state.placedPlants.map((p) => {
+                    const def = PLANT_CATALOG[p.species];
+                    const selected = state.selectedPlantId === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => onSelectPlant(p.id)}
+                        aria-label={`Inspect ${p.name}`}
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] whitespace-nowrap transition-colors cursor-pointer ${
+                          selected
+                            ? 'bg-emerald-950 border-emerald-500 text-emerald-200 font-medium'
+                            : 'bg-neutral-950 hover:bg-neutral-800 border-neutral-800 text-neutral-300'
+                        }`}
+                      >
+                        <span>{def.icon}</span>
+                        <span>{def.name.split(' ')[0]}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -205,6 +239,25 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                   </button>
                 ))}
               </div>
+
+              {faunaEntities.length > 0 && onSelectFaunaById && (
+                <div className="flex items-center gap-1.5 pt-1 overflow-x-auto no-scrollbar">
+                  <span className="text-[11px] text-neutral-500 whitespace-nowrap mr-1">
+                    Active Fauna ({faunaEntities.length}):
+                  </span>
+                  {faunaEntities.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => onSelectFaunaById(c.id)}
+                      aria-label={`Inspect creature ${c.name}`}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-950 hover:bg-neutral-800 border border-neutral-800 text-[11px] text-neutral-300 whitespace-nowrap transition-colors cursor-pointer"
+                    >
+                      <span>{c.name}</span>
+                      <span className="text-[10px] text-emerald-400 capitalize">({c.state})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

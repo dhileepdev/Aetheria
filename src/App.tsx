@@ -37,6 +37,9 @@ import { PlantingBanner } from './components/PlantingBanner';
 import { PlantEditCard } from './components/PlantEditCard';
 import { FaunaCard } from './components/FaunaCard';
 import { ControlDock } from './components/ControlDock';
+import { TimelapseDrawer } from './components/TimelapseDrawer';
+import { TimelapseFrame, TimelapseConfig } from './types/timelapse';
+import { formatFrameLabel } from './utils/timelapse';
 
 const isSoftwareGl = (() => {
   if (typeof document === 'undefined') return false;
@@ -144,6 +147,7 @@ interface TerrariumWorldProps {
   onSelectPlant: (id: string | null) => void;
   onSelectFauna: (entity: FaunaEntity | null) => void;
   onPlacePlant: (species: PlantSpecies, x: number, z: number) => void;
+  onBindCanvasRefs?: (refs: { gl: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera }) => void;
 }
 
 const TerrariumWorld: React.FC<TerrariumWorldProps> = ({
@@ -152,9 +156,16 @@ const TerrariumWorld: React.FC<TerrariumWorldProps> = ({
   onSelectPlant,
   onSelectFauna,
   onPlacePlant,
+  onBindCanvasRefs,
 }) => {
   const { gl, scene, camera, invalidate } = useThree();
   const controlsRef = useRef<OrbitControlsImpl>(null);
+
+  useEffect(() => {
+    if (onBindCanvasRefs) {
+      onBindCanvasRefs({ gl, scene, camera: camera as THREE.PerspectiveCamera });
+    }
+  }, [gl, scene, camera, onBindCanvasRefs]);
 
   const substrate = useMemo(() => new SubstrateModel(), []);
   const vessel = useMemo(() => new GlassVesselModel(isSoftwareGl), []);
@@ -467,7 +478,136 @@ export default function App() {
   const [isCinemaMode, setIsCinemaMode] = useState(false);
   const [isDockCollapsed, setIsDockCollapsed] = useState(false);
 
+  // Timelapse State
+  const [timelapseFrames, setTimelapseFrames] = useState<TimelapseFrame[]>([]);
+  const [timelapseConfig, setTimelapseConfig] = useState<TimelapseConfig>({
+    autoCapture: false,
+    intervalSeconds: 10,
+    maxFrames: 60,
+    solarStepCapture: false,
+  });
+  const [isTimelapseOpen, setIsTimelapseOpen] = useState<boolean>(false);
+  const [isRecordingSequence, setIsRecordingSequence] = useState<boolean>(false);
+
+  const canvasRefs = useRef<{ gl: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera } | null>(null);
   const faunaManager = useMemo(() => new FaunaManager(), []);
+
+  const handleBindCanvasRefs = useCallback((refs: { gl: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera }) => {
+    canvasRefs.current = refs;
+  }, []);
+
+  const handleCaptureFrame = useCallback((customLabel?: string) => {
+    if (!canvasRefs.current) return;
+    const { gl, scene, camera } = canvasRefs.current;
+    try {
+      gl.render(scene, camera);
+      const dataUrl = gl.domElement.toDataURL('image/png');
+      const label = customLabel || formatFrameLabel(state.timeOfDay, state.placedPlants.length, state.weather);
+      const newFrame: TimelapseFrame = {
+        id: `frame_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        timestamp: Date.now(),
+        timeOfDay: state.timeOfDay,
+        dataUrl,
+        plantCount: state.placedPlants.length,
+        weather: state.weather,
+        label,
+      };
+
+      setTimelapseFrames((prev) => {
+        const updated = [...prev, newFrame];
+        if (updated.length > timelapseConfig.maxFrames) {
+          return updated.slice(updated.length - timelapseConfig.maxFrames);
+        }
+        return updated;
+      });
+    } catch {
+      // ignore
+    }
+  }, [state.timeOfDay, state.placedPlants.length, state.weather, timelapseConfig.maxFrames]);
+
+  const handleRunSolarSequence = useCallback(async () => {
+    if (isRecordingSequence) return;
+    setIsRecordingSequence(true);
+    setIsTimelapseOpen(false);
+
+    const solarHours = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22];
+    for (const h of solarHours) {
+      setState((prev) => ({ ...prev, timeOfDay: h }));
+      await new Promise((res) => setTimeout(res, 220));
+
+      if (canvasRefs.current) {
+        const { gl, scene, camera } = canvasRefs.current;
+        gl.render(scene, camera);
+        const dataUrl = gl.domElement.toDataURL('image/png');
+        const frameLabel = `Solar ${formatFrameLabel(h, state.placedPlants.length, state.weather)}`;
+        const newFrame: TimelapseFrame = {
+          id: `frame_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          timestamp: Date.now(),
+          timeOfDay: h,
+          dataUrl,
+          plantCount: state.placedPlants.length,
+          weather: state.weather,
+          label: frameLabel,
+        };
+        setTimelapseFrames((prev) => [...prev, newFrame]);
+      }
+    }
+
+    setIsRecordingSequence(false);
+    setIsTimelapseOpen(true);
+  }, [isRecordingSequence, state.placedPlants.length, state.weather]);
+
+  const handleRunGrowthSequence = useCallback(async () => {
+    if (isRecordingSequence) return;
+    setIsRecordingSequence(true);
+    setIsTimelapseOpen(false);
+
+    const stages = [0.25, 0.4, 0.55, 0.7, 0.85, 1.0, 1.15];
+    for (const stage of stages) {
+      setState((prev) => ({
+        ...prev,
+        placedPlants: prev.placedPlants.map((p) => ({ ...p, growthStage: stage })),
+      }));
+      await new Promise((res) => setTimeout(res, 220));
+
+      if (canvasRefs.current) {
+        const { gl, scene, camera } = canvasRefs.current;
+        gl.render(scene, camera);
+        const dataUrl = gl.domElement.toDataURL('image/png');
+        const stageLabel = `Growth ${(stage * 100).toFixed(0)}% • ${formatFrameLabel(state.timeOfDay, state.placedPlants.length, state.weather)}`;
+        const newFrame: TimelapseFrame = {
+          id: `frame_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          timestamp: Date.now(),
+          timeOfDay: state.timeOfDay,
+          dataUrl,
+          plantCount: state.placedPlants.length,
+          weather: state.weather,
+          label: stageLabel,
+        };
+        setTimelapseFrames((prev) => [...prev, newFrame]);
+      }
+    }
+
+    setIsRecordingSequence(false);
+    setIsTimelapseOpen(true);
+  }, [isRecordingSequence, state.timeOfDay, state.placedPlants.length, state.weather]);
+
+  const handleDeleteFrame = useCallback((id: string) => {
+    setTimelapseFrames((prev) => prev.filter((f) => f.id !== id));
+  }, []);
+
+  const handleClearAllFrames = useCallback(() => {
+    setTimelapseFrames([]);
+  }, []);
+
+  // Auto capture timer
+  useEffect(() => {
+    if (!timelapseConfig.autoCapture || isRecordingSequence) return;
+    const interval = window.setInterval(() => {
+      handleCaptureFrame('Auto-Capture');
+    }, timelapseConfig.intervalSeconds * 1000);
+    return () => clearInterval(interval);
+  }, [timelapseConfig.autoCapture, timelapseConfig.intervalSeconds, isRecordingSequence, handleCaptureFrame]);
 
   // Advance day/night solar cycle when timeSpeed > 0
   useEffect(() => {
@@ -512,6 +652,7 @@ export default function App() {
       } else if (e.key === 'Escape') {
         setState((prev) => ({ ...prev, activePlantingSpecies: null, selectedPlantId: null }));
         setSelectedFauna(null);
+        setIsTimelapseOpen(false);
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -723,6 +864,7 @@ export default function App() {
             powerPreference: 'high-performance',
             toneMapping: THREE.ACESFilmicToneMapping,
             toneMappingExposure: 1.1,
+            preserveDrawingBuffer: true,
           }}
         >
           <TerrariumWorld
@@ -731,6 +873,7 @@ export default function App() {
             onSelectPlant={(id) => handleUpdateState({ selectedPlantId: id })}
             onSelectFauna={(entity) => setSelectedFauna(entity)}
             onPlacePlant={handlePlacePlant}
+            onBindCanvasRefs={handleBindCanvasRefs}
           />
         </Canvas>
       </div>
@@ -742,6 +885,8 @@ export default function App() {
         onToggleCinema={() => setIsCinemaMode((prev) => !prev)}
         isCinemaMode={isCinemaMode}
         onResetEcosystem={handleResetEcosystem}
+        onOpenTimelapse={() => setIsTimelapseOpen(true)}
+        frameCount={timelapseFrames.length}
       />
 
       {/* Active Planting Instruction Banner */}
@@ -805,8 +950,26 @@ export default function App() {
               setSelectedFauna({ ...found });
             }
           }}
+          onOpenTimelapse={() => setIsTimelapseOpen(true)}
+          onCaptureFrame={() => handleCaptureFrame()}
+          timelapseFrameCount={timelapseFrames.length}
         />
       )}
+
+      {/* Timelapse Drawer / Modal */}
+      <TimelapseDrawer
+        frames={timelapseFrames}
+        config={timelapseConfig}
+        isOpen={isTimelapseOpen}
+        onClose={() => setIsTimelapseOpen(false)}
+        onCaptureFrame={handleCaptureFrame}
+        onRunSolarSequence={handleRunSolarSequence}
+        onRunGrowthSequence={handleRunGrowthSequence}
+        onDeleteFrame={handleDeleteFrame}
+        onClearAllFrames={handleClearAllFrames}
+        onUpdateConfig={(partial) => setTimelapseConfig((prev) => ({ ...prev, ...partial }))}
+        isRecordingSequence={isRecordingSequence}
+      />
     </main>
   );
 }

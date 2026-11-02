@@ -1,5 +1,5 @@
 import React from 'react';
-import { Volume2, VolumeX, Eye, EyeOff, Sparkles, Sun, Moon, CloudRain, Wind } from 'lucide-react';
+import { Volume2, VolumeX, Eye, EyeOff, Sparkles, Sun, Moon, CloudRain, Wind, Film } from 'lucide-react';
 import { formatTimeOfDay } from '../utils/math';
 import { TerrariumState } from '../types/terrarium';
 
@@ -9,6 +9,8 @@ interface HeaderBarProps {
   onToggleCinema: () => void;
   isCinemaMode: boolean;
   onResetEcosystem: () => void;
+  onOpenTimelapse: () => void;
+  frameCount: number;
 }
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -17,6 +19,8 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   onToggleCinema,
   isCinemaMode,
   onResetEcosystem,
+  onOpenTimelapse,
+  frameCount,
 }) => {
   const isNight = state.timeOfDay < 5.5 || state.timeOfDay > 19.5;
 
@@ -51,6 +55,20 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
 
       {/* Action Tools */}
       <div className="flex items-center gap-2 pointer-events-auto">
+        {/* Timelapse Studio Button */}
+        <button
+          onClick={onOpenTimelapse}
+          aria-label="Open timelapse studio"
+          title="Open Timelapse Studio"
+          className="bg-neutral-900/90 hover:bg-neutral-800/90 border border-neutral-800 text-neutral-200 hover:text-white px-3 py-2 rounded-xl transition-colors shadow-lg cursor-pointer flex items-center gap-2 text-xs font-medium"
+        >
+          <Film size={15} className="text-emerald-400" />
+          <span className="hidden sm:inline">Timelapse</span>
+          <span className="px-1.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 font-mono text-[10px] border border-emerald-800">
+            {frameCount}
+          </span>
+        </button>
+
         {/* Procedural Sound Toggle */}
         <button
           onClick={onToggleSound}

@@ -27,6 +27,8 @@ import {
 } from 'lucide-react';
 import { formatTimeOfDay } from '../utils/math';
 
+import { Film } from 'lucide-react';
+
 interface ControlDockProps {
   state: TerrariumState;
   onUpdateState: (partial: Partial<TerrariumState>) => void;
@@ -39,9 +41,12 @@ interface ControlDockProps {
   onSelectPlant?: (id: string) => void;
   faunaEntities?: { id: string; name: string; species: FaunaSpecies; state: string }[];
   onSelectFaunaById?: (id: string) => void;
+  onOpenTimelapse?: () => void;
+  onCaptureFrame?: () => void;
+  timelapseFrameCount?: number;
 }
 
-type TabType = 'flora' | 'fauna' | 'lighting' | 'weather' | 'vessel' | 'camera';
+type TabType = 'flora' | 'fauna' | 'lighting' | 'weather' | 'vessel' | 'camera' | 'timelapse';
 
 export const ControlDock: React.FC<ControlDockProps> = ({
   state,
@@ -55,6 +60,9 @@ export const ControlDock: React.FC<ControlDockProps> = ({
   onSelectPlant,
   faunaEntities = [],
   onSelectFaunaById,
+  onOpenTimelapse,
+  onCaptureFrame,
+  timelapseFrameCount = 0,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('flora');
 
@@ -65,6 +73,7 @@ export const ControlDock: React.FC<ControlDockProps> = ({
     { id: 'weather', label: 'Weather', icon: <CloudRain size={15} /> },
     { id: 'vessel', label: 'Vessel', icon: <Cylinder size={15} /> },
     { id: 'camera', label: 'Camera', icon: <Camera size={15} /> },
+    { id: 'timelapse', label: 'Timelapse', icon: <Film size={15} /> },
   ];
 
   return (
@@ -544,6 +553,53 @@ export const ControlDock: React.FC<ControlDockProps> = ({
                 >
                   <RotateCw size={13} />
                   <span>Auto-Rotate {state.autoRotate ? 'ON' : 'OFF'}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 7: TIMELAPSE */}
+          {activeTab === 'timelapse' && (
+            <div className="w-full space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-semibold text-neutral-200">Timelapse Recorder & Visualizer</h4>
+                  <p className="text-[11px] text-neutral-400">Capture 3D growth history, solar cycles, or export HTML player</p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {onCaptureFrame && (
+                    <button
+                      onClick={onCaptureFrame}
+                      aria-label="Snap current 3D frame"
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow"
+                    >
+                      <Camera size={14} />
+                      <span>Snap Frame</span>
+                    </button>
+                  )}
+
+                  {onOpenTimelapse && (
+                    <button
+                      onClick={onOpenTimelapse}
+                      aria-label="Open timelapse studio"
+                      className="bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Film size={14} className="text-emerald-400" />
+                      <span>Studio ({timelapseFrameCount})</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-neutral-950 p-3 rounded-xl border border-neutral-800 flex items-center justify-between text-xs text-neutral-400">
+                <span>Captured Frames: <strong className="text-emerald-400 font-mono">{timelapseFrameCount}</strong></span>
+                <span className="hidden sm:inline text-neutral-500">Auto-capture options & 24h sequence available in Studio</span>
+                <button
+                  onClick={onOpenTimelapse}
+                  className="text-emerald-400 hover:text-emerald-300 font-medium cursor-pointer"
+                >
+                  Open Full Visualizer →
                 </button>
               </div>
             </div>
